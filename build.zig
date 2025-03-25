@@ -36,13 +36,22 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Define the static library.
+    // Add the build helper module
+    _ = b.addModule("xlsxio_build", .{
+        .root_source_file = b.path("src/build_module.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Create a shared library that consumers can link against
     const lib = b.addStaticLibrary(.{
         .name = "zig_xlsxio",
         .root_source_file = b.path("src/xlsxio.zig"),
         .target = target,
         .optimize = optimize,
     });
+
+    // Setup library paths and includes
     const xlsxio_include = b.path("vendor/xlsxio/include");
     const xlsxio_lib = b.path("vendor/xlsxio/lib");
     lib.addIncludePath(xlsxio_include);
@@ -51,11 +60,23 @@ pub fn build(b: *std.Build) void {
     lib.linkSystemLibrary("xlsxio_write");
     lib.linkLibC();
 
-    // Install DLLs for the install step.
-    installDlls(b, lib);
+    // Install DLLs to the bin directory
+    for (dlls) |dll_path| {
+        const dll_basename = std.fs.path.basename(dll_path);
+        b.installFile(dll_path, dll_basename);
+    }
+
+    // Install the library
     b.installArtifact(lib);
 
-    // Create a test artifact.
+    // Setup dependencies for linking (removed linkage assignment as it's not available in 0.14.0)
+    const options = b.addOptions();
+    options.addOption([]const u8, "include_path", "vendor/xlsxio/include");
+    options.addOption([]const u8, "lib_path", "vendor/xlsxio/lib");
+    options.addOption([]const []const u8, "system_libs", &[_][]const u8{ "xlsxio_read", "xlsxio_write" });
+    options.addOption(bool, "link_libc", true);
+
+    // Create a test artifact
     const tests = b.addTest(.{
         .root_source_file = b.path("src/xlsxio.zig"),
         .target = target,
@@ -73,7 +94,7 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_tests.step);
 
-    // Create an executable to demonstrate xlsxio usage.
+    // Create a demo executable to show usage
     const exe = b.addExecutable(.{
         .name = "xlsxio_demo",
         .root_source_file = b.path("src/main.zig"),
@@ -86,9 +107,6 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("xlsxio_write");
     exe.linkLibC();
     exe.root_module.addImport("xlsxio", xlsxio_mod);
-
-    // Also install DLLs for the demo
-    installDlls(b, exe);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -99,4 +117,12 @@ pub fn build(b: *std.Build) void {
     }
     const run_step = b.step("run", "Run the demo application");
     run_step.dependOn(&run_cmd.step);
+
+    // Add an option to explicitly install just the DLLs
+    const install_dlls_step = b.step("install-dlls", "Install DLLs only");
+    for (dlls) |dll_path| {
+        const dll_basename = std.fs.path.basename(dll_path);
+        const install_file_step = b.addInstallFile(b.path(dll_path), dll_basename);
+        install_dlls_step.dependOn(&install_file_step.step);
+    }
 }

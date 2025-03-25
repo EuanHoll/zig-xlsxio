@@ -1,10 +1,84 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+// Export build module for easier integration
+pub const build_module = @import("build_module.zig");
+
 // Runtime check for Windows 64-bit
 comptime {
     if (builtin.os.tag != .windows or builtin.cpu.arch != .x86_64) {
         @compileError("This library only supports Windows 64-bit platforms");
+    }
+}
+
+// Import build options if available
+const options = if (@hasDecl(@import("root"), "xlsxio_options"))
+    @import("root").xlsxio_options
+else
+    struct {};
+
+// Auto-link C libraries when imported as a module
+pub fn getIncludePath() []const u8 {
+    if (@hasDecl(options, "include_path")) {
+        return options.include_path;
+    }
+    return "vendor/xlsxio/include";
+}
+
+pub fn getLibPath() []const u8 {
+    if (@hasDecl(options, "lib_path")) {
+        return options.lib_path;
+    }
+    return "vendor/xlsxio/lib";
+}
+
+pub fn getSystemLibs() []const []const u8 {
+    if (@hasDecl(options, "system_libs")) {
+        return options.system_libs;
+    }
+    return &[_][]const u8{ "xlsxio_read", "xlsxio_write" };
+}
+
+pub fn shouldLinkLibC() bool {
+    if (@hasDecl(options, "link_libc")) {
+        return options.link_libc;
+    }
+    return true;
+}
+
+// Function to handle DLL installation
+pub fn installDlls(b: *std.Build, artifact: *std.Build.Step.Compile) void {
+    const dlls = [_][]const u8{
+        "xlsxio_read.dll",
+        "xlsxio_write.dll",
+        "libexpat.dll",
+        "minizip.dll",
+        "zlib1.dll",
+        "bz2.dll",
+    };
+
+    // Create a custom step for DLL installation
+    const install_dlls_step = b.step("install-dlls", "Install DLLs");
+
+    // Find path to binaries
+    const pkg_path = comptime blk: {
+        const root_dir = std.fs.path.dirname(@src().file) orelse ".";
+        break :blk root_dir;
+    };
+
+    // Install each DLL
+    inline for (dlls) |dll| {
+        const install_file_step = b.addInstallBinFile(b.path(b.pathJoin(&.{ pkg_path, "..", "vendor", "xlsxio", "bin", dll })), dll);
+        install_dlls_step.dependOn(&install_file_step.step);
+    }
+
+    // Make main installation depend on DLL installation
+    b.getInstallStep().dependOn(install_dlls_step);
+
+    // Add bin directory to PATH for run commands
+    if (artifact.kind == .exe) {
+        const run_cmd = b.addRunArtifact(artifact);
+        run_cmd.addPathDir("bin");
     }
 }
 

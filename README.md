@@ -21,13 +21,12 @@ A Zig wrapper for [xlsxio](https://github.com/brechtsanders/xlsxio), a library f
 
 ```bash
 # Add to your project
-zig fetch --save https://github.com/yourusername/zig-xlsxio/archive/refs/tags/v0.1.0.tar.gz
-
-# Or with git
 zig fetch --save git+https://github.com/yourusername/zig-xlsxio
 ```
 
 ### Usage in build.zig
+
+The simplest way to use this package is:
 
 ```zig
 const std = @import("std");
@@ -56,47 +55,67 @@ pub fn build(b: *std.Build) void {
     // Install the artifact
     b.installArtifact(exe);
     
-    // Install necessary DLLs and create a run command
-    const xlsxio_pkg = @import("xlsxio");
-    xlsxio_pkg.installDlls(b, exe);
+    // Simple DLL installation - copies DLLs to bin directory
+    const bin_dir = xlsxio_dep.path("vendor/xlsxio/bin");
+    const dlls = [_][]const u8{
+        "xlsxio_read.dll",
+        "xlsxio_write.dll",
+        "libexpat.dll",
+        "minizip.dll", 
+        "zlib1.dll",
+        "bz2.dll",
+    };
     
-    // Add your custom run command arguments if needed
-    const run_step = b.step("run", "Run the application");
-    const run_cmd = b.addRunArtifact(exe);
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+    for (dlls) |dll| {
+        b.installBinFile(b.pathJoin(&.{bin_dir.getPath(b), dll}), dll);
     }
+    
+    // Create a run command that includes the bin directory in PATH
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.addPathDir("bin");
+    
+    const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 }
 ```
 
-### Handling DLLs
+### Using build_module.zig (Easier Alternative)
 
-When using this package, you need to ensure the DLLs are available at runtime. There are two options:
+For an even easier approach, you can use the provided `build_module.zig` helper:
 
-1. **Recommended:** Use the `installDlls` helper function as shown above, which will:
-   - Copy all necessary DLLs to your executable's output directory
-   - Create a run command that includes the DLL directory in PATH
-   
-   If you already have a run command in your build.zig, use this instead:
-   
-   ```zig
-   // First install the DLLs
-   const xlsxio_dep = b.dependency("xlsxio", .{});
-   xlsxio_dep.module("xlsxio").installDlls(b, exe);
-   
-   // Then for your existing run command, add the bin directory to PATH:
-   const run_cmd = b.addRunArtifact(exe);
-   run_cmd.addPathDir("bin");
-   ```
+```zig
+const std = @import("std");
 
-2. **Manual:** Copy the following DLLs from the package's `vendor/xlsxio/bin` directory to your executable's directory:
-   - xlsxio_read.dll
-   - xlsxio_write.dll
-   - libexpat.dll
-   - minizip.dll
-   - zlib1.dll
-   - bz2.dll
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const exe = b.addExecutable(.{
+        .name = "my_app",
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Get the xlsxio dependency
+    const xlsxio_dep = b.dependency("xlsxio", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    
+    // Add the build helper module
+    const build_mod = @import("xlsxio").build_module;
+    
+    // One function handles everything: import, linking, and DLL installation
+    build_mod.linkXlsxioModule(b, exe, xlsxio_dep);
+    
+    b.installArtifact(exe);
+    
+    const run_cmd = b.addRunArtifact(exe);
+    const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run_cmd.step);
+}
+```
 
 ### Manual Installation
 
@@ -222,5 +241,4 @@ pub fn main() !void {
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
-
+This project is licensed under the MIT License - see the LICENSE file for details.
