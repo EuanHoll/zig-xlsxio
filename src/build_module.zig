@@ -1,3 +1,4 @@
+// In vendor/xlsxio/src/build_module.zig
 const std = @import("std");
 
 pub fn linkXlsxioModule(
@@ -25,7 +26,6 @@ pub fn linkXlsxioModule(
     if (exe.kind == .exe) {
         // Custom DLL installation step
         const bin_dir = b.pathJoin(&.{ pkg_path, "vendor", "xlsxio", "bin" });
-
         const dlls = [_][]const u8{
             "xlsxio_read.dll",
             "xlsxio_write.dll",
@@ -35,7 +35,6 @@ pub fn linkXlsxioModule(
             "bz2.dll",
         };
 
-        // Install the DLLs to the bin directory
         for (dlls) |dll| {
             const src_path = b.pathJoin(&.{ bin_dir, dll });
             b.installBinFile(b.path(src_path), dll);
