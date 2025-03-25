@@ -25,8 +25,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Expose an option for whether to install DLLs; default is true.
-    const installDllsOpt = b.option(bool, "install_dlls", "Install xlsxio DLLs") orelse true;
+    // Expose an option "install_dlls" (default true)
+    const install_dlls_opt = b.option(bool, "install_dlls", "Install DLLs") orelse true;
 
     // Define the xlsxio module.
     const xlsxio_mod = b.addModule("xlsxio", .{
@@ -34,6 +34,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    // Add the include path so that @cImport finds xlsxio_read.h
+    xlsxio_mod.addIncludePath(b.path("vendor/xlsxio/include"));
 
     // Add the build helper module.
     _ = b.addModule("xlsxio_build", .{
@@ -42,14 +44,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Create a shared library for consumers to link against.
+    // Create a shared library that consumers can link against.
     const lib = b.addStaticLibrary(.{
         .name = "zig_xlsxio",
         .root_source_file = b.path("src/xlsxio.zig"),
         .target = target,
         .optimize = optimize,
     });
-
     const xlsxio_include = b.path("vendor/xlsxio/include");
     const xlsxio_lib = b.path("vendor/xlsxio/lib");
     lib.addIncludePath(xlsxio_include);
@@ -58,8 +59,8 @@ pub fn build(b: *std.Build) void {
     lib.linkSystemLibrary("xlsxio_write");
     lib.linkLibC();
 
-    // Conditionally install DLLs.
-    if (installDllsOpt) {
+    // Conditionally install DLLs if the option is true.
+    if (install_dlls_opt) {
         for (dlls) |dll_path| {
             const dll_basename = std.fs.path.basename(dll_path);
             b.installFile(dll_path, dll_basename);
@@ -116,7 +117,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // Optionally add a step to install DLLs only.
-    if (installDllsOpt) {
+    if (install_dlls_opt) {
         const install_dlls_step = b.step("install-dlls", "Install DLLs only");
         for (dlls) |dll_path| {
             const dll_basename = std.fs.path.basename(dll_path);
