@@ -19,8 +19,8 @@ pub fn linkXlsxioModule(
 
     exe.addIncludePath(b.path(include_path));
     exe.addLibraryPath(b.path(lib_path));
-    exe.linkSystemLibrary("xlsxio_read");
-    exe.linkSystemLibrary("xlsxio_write");
+    exe.addObjectFile(b.path(lib_path ++ "/xlsxio_read.lib"));
+    exe.addObjectFile(b.path(lib_path ++ "/xlsxio_write.lib"));
 
     // Install DLLs if this is an executable
     if (exe.kind == .exe) {

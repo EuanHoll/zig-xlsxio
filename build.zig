@@ -55,9 +55,6 @@ pub fn build(b: *std.Build) void {
     const xlsxio_lib = b.path("vendor/xlsxio/lib");
     lib.addIncludePath(xlsxio_include);
     lib.addLibraryPath(xlsxio_lib);
-    lib.linkSystemLibrary("xlsxio_read");
-    lib.linkSystemLibrary("xlsxio_write");
-    lib.addLibraryPath(b.path("vendor/xlsxio/lib"));
     lib.addObjectFile(b.path("vendor/xlsxio/lib/xlsxio_read.lib"));
     lib.addObjectFile(b.path("vendor/xlsxio/lib/xlsxio_write.lib"));
     lib.linkLibC();
