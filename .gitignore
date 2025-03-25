@@ -1,0 +1,21 @@
+# Zig build artifacts
+**/.zig-cache/
+**/zig-out/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Vendor build artifacts
+vendor/xlsxio/build/
+vendor/xlsxio/*.o
+vendor/xlsxio/*.obj
+vendor/**/*.o
+vendor/**/*.obj
+vendor/**/build/
