@@ -9,6 +9,22 @@ const dlls = [_][]const u8{
     "vendor/xlsxio/bin/bz2.dll",
 };
 
+/// Helper function for consumers to install necessary DLLs
+pub fn installDlls(b: *std.Build, artifact: *std.Build.Step.Compile) void {
+    // Install DLLs to the binary directory
+    for (dlls) |dll_path| {
+        const dll_basename = std.fs.path.basename(dll_path);
+        b.installFile(dll_path, dll_basename);
+    }
+
+    // For executables, create a run command that adds the DLL directory to the PATH
+    if (artifact.kind == .exe) {
+        // Create a run command for the artifact that includes the DLL directory in PATH
+        const run_cmd = b.addRunArtifact(artifact);
+        run_cmd.addPathDir("bin"); // Add the bin directory to PATH
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -36,10 +52,7 @@ pub fn build(b: *std.Build) void {
     lib.linkLibC();
 
     // Install DLLs for the install step.
-    for (dlls) |dll| {
-        const dll_basename = std.fs.path.basename(dll);
-        b.installFile(dll, dll_basename);
-    }
+    installDlls(b, lib);
     b.installArtifact(lib);
 
     // Create a test artifact.
@@ -73,6 +86,9 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("xlsxio_write");
     exe.linkLibC();
     exe.root_module.addImport("xlsxio", xlsxio_mod);
+
+    // Also install DLLs for the demo
+    installDlls(b, exe);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
