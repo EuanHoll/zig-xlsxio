@@ -57,6 +57,9 @@ pub fn build(b: *std.Build) void {
     lib.addLibraryPath(xlsxio_lib);
     lib.linkSystemLibrary("xlsxio_read");
     lib.linkSystemLibrary("xlsxio_write");
+    lib.addLibraryPath(b.path("vendor/xlsxio/lib"));
+    lib.addObjectFile(b.path("vendor/xlsxio/lib/xlsxio_read.lib"));
+    lib.addObjectFile(b.path("vendor/xlsxio/lib/xlsxio_write.lib"));
     lib.linkLibC();
 
     // Conditionally install DLLs if the option is true.
